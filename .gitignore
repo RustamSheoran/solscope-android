@@ -1,0 +1,26 @@
+# Android
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+
+# Kotlin
+*.class
+out/
+
+# Logs
+*.log
+
+# Local properties
+local.properties
+
+# AI memory system (LOCAL ONLY)
+.ai/
+
+# Environment
+.env
