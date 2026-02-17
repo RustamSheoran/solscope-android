@@ -68,6 +68,28 @@ class HttpSolanaRpcClient(
             .map { it.signature }
     }
 
+    override suspend fun getAccountInfo(
+        address: String,
+        network: SolanaNetwork
+    ): com.example.solscope.data.rpc.model.AccountInfoValue? = withContext(Dispatchers.IO) {
+        val params = listOf(
+            address,
+            mapOf("encoding" to "jsonParsed")
+        )
+
+        val requestBody = buildJsonRpcRequestBody(
+            method = "getAccountInfo",
+            params = params
+        )
+
+        val httpRequest = Request.Builder()
+            .url(resolveNetworkUrl(network))
+            .post(requestBody)
+            .build()
+            
+        executeAndParse<com.example.solscope.data.rpc.model.GetAccountInfoResult>(httpRequest).value
+    }
+
     private fun resolveNetworkUrl(network: SolanaNetwork): String {
         return when (network) {
             SolanaNetwork.MAINNET -> "https://api.mainnet-beta.solana.com"

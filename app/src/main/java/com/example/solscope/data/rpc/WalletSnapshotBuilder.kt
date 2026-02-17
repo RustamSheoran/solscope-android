@@ -1,27 +1,24 @@
 package com.example.solscope.data.rpc
 
+import com.example.solscope.data.rpc.model.AccountInfoValue
 import com.example.solscope.domain.model.WalletSnapshot
 
 /**
- * Helper responsible for constructing [WalletSnapshot] instances
- * from low-level RPC data.
- *
- * This class intentionally contains no risk or business logic.
+ * Helper responsible for constructing [WalletSnapshot] instances from low-level RPC data.
  */
 object WalletSnapshotBuilder {
 
-    /**
-     * Build a basic [WalletSnapshot] from an address and its
-     * current balance in lamports.
-     */
-    fun fromBalance(
+    fun fromRpcData(
         address: String,
-        balanceLamports: Long
+        balance: Long,
+        history: List<String>,
+        accountInfo: AccountInfoValue?
     ): WalletSnapshot {
         return WalletSnapshot(
             address = address,
-            balance = balanceLamports
+            balance = balance,
+            transactionCount = history.size,
+            isExecutable = accountInfo?.executable ?: false
         )
     }
 }
-

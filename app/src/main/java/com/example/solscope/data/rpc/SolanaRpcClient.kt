@@ -34,6 +34,11 @@ interface SolanaRpcClient {
     suspend fun getSignaturesForAddress(
         address: String,
         network: SolanaNetwork,
-        limit: Int = 20
+        limit: Int
     ): List<String>
+
+    suspend fun getAccountInfo(
+        address: String,
+        network: SolanaNetwork
+    ): com.example.solscope.data.rpc.model.AccountInfoValue?
 }

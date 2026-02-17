@@ -6,6 +6,7 @@ package com.example.solscope.domain.model
  */
 data class WalletSnapshot(
     val address: String,
-    val balance: Long
-    // TODO: Add more fields as required by RiskEngine
+    val balance: Long,
+    val transactionCount: Int,
+    val isExecutable: Boolean
 )
