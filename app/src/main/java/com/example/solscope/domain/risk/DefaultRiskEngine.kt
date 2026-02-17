@@ -21,42 +21,43 @@ class DefaultRiskEngine : RiskEngine {
             return RiskScore(50, RiskLevel.WARNING, listOf("Program address detected"))
         }
 
-        val reasons = mutableListOf<String>()
+        val risks = mutableListOf<String>()
+        val positives = mutableListOf<String>()
         var scoreDelta = 0
 
         with(snapshot) {
             // Rule Group 1: Balance Checks
             if (balance == 0L) {
                 scoreDelta -= 30
-                reasons.add("Wallet is completely empty")
+                risks.add("Wallet is completely empty")
             } else if (balance < DUST_THRESHOLD) {
                 scoreDelta -= 10
-                reasons.add("Very low balance (Dust)")
+                risks.add("Very low balance (Dust)")
             }
 
             // Cumulative Balance Bonuses
             if (balance >= SOLVENT_THRESHOLD) {
                 scoreDelta += 10
-                reasons.add("Sufficient SOL balance")
+                positives.add("Sufficient SOL balance")
             }
             if (balance >= HIGH_VALUE_THRESHOLD) {
                 scoreDelta += 10
-                reasons.add("High value wallet")
+                positives.add("High value wallet")
             }
 
             // Rule Group 2: Activity Checks
             when {
                 transactionCount == 0 -> {
                     scoreDelta -= 40
-                    reasons.add("No transaction history")
+                    risks.add("No transaction history")
                 }
                 transactionCount < 10 -> {
                     scoreDelta -= 20
-                    reasons.add("New or low-activity wallet")
+                    risks.add("New or low-activity wallet")
                 }
                 transactionCount >= 50 -> {
                     scoreDelta += 20
-                    reasons.add("Established transaction history")
+                    positives.add("Established transaction history")
                 }
             }
         }
@@ -70,7 +71,9 @@ class DefaultRiskEngine : RiskEngine {
                 in 40..69 -> RiskLevel.WARNING
                 else -> RiskLevel.SAFE
             },
-            reasons = reasons
+            reasons = risks,
+            positives = positives,
+            snapshot = snapshot
         )
     }
 }

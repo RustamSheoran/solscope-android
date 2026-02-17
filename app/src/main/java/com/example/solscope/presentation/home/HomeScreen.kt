@@ -20,87 +20,123 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import com.example.solscope.presentation.components.ClayButton
-import com.example.solscope.presentation.components.ClayCard
-import com.example.solscope.presentation.theme.*
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import com.example.solscope.presentation.components.ConnectWalletButton
+import com.example.solscope.presentation.components.GlassCard
+import com.example.solscope.presentation.components.GlassButton
+import com.example.solscope.ui.theme.CyberColors
+import androidx.compose.ui.res.painterResource
+import com.example.solscope.R
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
 fun HomeScreen(
-    onAnalyze: (String) -> Unit
+    onAnalyze: (String) -> Unit,
+    connectedWallet: String? = null,
+    onConnect: () -> Unit = {},
+    onDisconnect: () -> Unit = {},
+    isDarkTheme: Boolean = true,
+    onToggleTheme: () -> Unit = {}
 ) {
 
-    var walletAddress by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
     val platformContext = LocalContext.current
-    val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
     
     // Demo Address (Known active whale wallet for testing)
     val demoAddress = "FxvohgxLw4GbpATWEVxoNkyS9wV3G27gt3whnXJi8rqa"
 
-    Scaffold(
-        containerColor = AutumnBackground
-    ) { padding ->
-
-        Box(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = {
+                    focusManager.clearFocus()
+                })
+            }
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 20.dp)
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.Top
+
+            // Top bar: Theme toggle + Connect
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-
-                Spacer(modifier = Modifier.height(100.dp))
-                
-                Text(
-                    "SolScope",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 36.sp,
-                    color = AutumnText
+                IconButton(onClick = onToggleTheme) {
+                    Icon(
+                        painter = painterResource(
+                            id = if (isDarkTheme) R.drawable.ic_sun else R.drawable.ic_moon
+                        ),
+                        contentDescription = if (isDarkTheme) "Light Mode" else "Dark Mode",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                ConnectWalletButton(
+                    connectedAddress = connectedWallet,
+                    onConnect = onConnect,
+                    onDisconnect = onDisconnect
                 )
-                Text(
-                    "Risk Analysis Engine",
-                    fontSize = 18.sp,
-                    color = AutumnText.copy(alpha = 0.8f) 
-                )
+            }
 
-                Spacer(modifier = Modifier.height(56.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-                // Wallet Input - 3D ClayCard
-                ClayCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = AutumnBackground
-                ) {
+            // Hero branding
+            Text(
+                text = "SolScope",
+                style = MaterialTheme.typography.displayLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = 40.sp,
+                letterSpacing = 2.sp
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Solana Risk Analysis Engine",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            // Wallet Input
+            GlassCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(8.dp)) {
                     Text(
                         "Target Wallet",
-                        fontWeight = FontWeight.Bold,
-                        color = AutumnText,
-                        fontSize = 18.sp,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
                     OutlinedTextField(
-                        value = walletAddress,
+                        value = address,
                         onValueChange = { input ->
-                            // Reject spaces and newlines
                             val filtered = input.filter { !it.isWhitespace() }
-                            walletAddress = filtered
+                            address = filtered
                         },
-                        placeholder = { 
+                        placeholder = {
                             Text(
                                 "Enter Solana address...",
-                                color = AutumnText.copy(alpha = 0.6f) 
-                            ) 
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         maxLines = 1,
                         textStyle = TextStyle(
-                            color = AutumnText,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp
                         ),
@@ -115,99 +151,85 @@ fun HomeScreen(
                                 if (clipData != null && clipData.itemCount > 0) {
                                     val text = clipData.getItemAt(0).text.toString()
                                     if (text.isNotBlank()) {
-                                        walletAddress = text.filter { !it.isWhitespace() }
+                                        address = text.filter { !it.isWhitespace() }
                                     }
                                 }
                             }) {
-                                Text(
-                                    "Paste",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    color = AutumnText.copy(alpha = 0.6f)
+                                Icon(
+                                    painter = painterResource(id = R.drawable.ic_paste),
+                                    contentDescription = "Paste",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
                                 )
                             }
                         },
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = AutumnPrimary,
-                            unfocusedBorderColor = Color.Transparent, 
-                            cursorColor = AutumnPrimary,
-                            focusedLabelColor = AutumnPrimary,
-                            unfocusedContainerColor = Color.White.copy(alpha = 0.5f), 
-                            focusedContainerColor = Color.White
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
                         ),
                         shape = RoundedCornerShape(12.dp)
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-                // Solana addresses are 32-44 chars (base58)
-                val isValidAddress = walletAddress.length >= 32
+            val base58Regex = Regex("^[1-9A-HJ-NP-Za-km-z]+$")
+            val isValidAddress = address.length in 32..44 && address.matches(base58Regex)
+            val analyzeText = if (isValidAddress) "ANALYZE WALLET" else "ANALYZE"
 
-                // Color transition only when valid address (32+ chars)
-                val analyzeColor by animateColorAsState(
-                    targetValue = if (isValidAddress) AutumnText else AutumnSecondary,
-                    animationSpec = tween(durationMillis = 200),
-                    label = "AnalyzeColor"
-                )
-                val analyzeTextColor by animateColorAsState(
-                    targetValue = if (isValidAddress) Color.White else AutumnText.copy(alpha = 0.5f),
-                    animationSpec = tween(durationMillis = 200),
-                    label = "AnalyzeTextColor"
-                )
-                val analyzeText = if (isValidAddress) "Analyze Wallet" else "Analyze"
-
-                Row(
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Analyze Button — uses onPrimary for text so it's visible in both modes
+                GlassButton(
+                    onClick = {
+                        if (isValidAddress) {
+                            focusManager.clearFocus()
+                            onAnalyze(address)
+                        }
+                    },
+                    enabled = isValidAddress,
+                    containerColor = if (isValidAddress) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        .weight(1f)
+                        .height(56.dp)
                 ) {
-                    // Analyze Button — color fills when valid address entered
-                    ClayButton(
-                        onClick = {
-                            if (isValidAddress) {
-                                keyboardController?.hide()
-                                onAnalyze(walletAddress)
-                            }
-                        },
-                        enabled = isValidAddress,
-                        backgroundColor = analyzeColor,
+                    Text(
+                        analyzeText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isValidAddress) MaterialTheme.colorScheme.onPrimary
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                    )
+                }
+
+                // Demo Button
+                AnimatedVisibility(
+                    visible = !isValidAddress,
+                    enter = fadeIn(tween(150)) + expandHorizontally(tween(150)),
+                    exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150))
+                ) {
+                    GlassButton(
+                        onClick = { address = demoAddress },
+                        containerColor = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(72.dp),
-                        cornerRadius = 20.dp
+                            .width(100.dp)
+                            .height(56.dp)
                     ) {
                         Text(
-                            analyzeText,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = if (isValidAddress) 21.sp else 18.sp,
-                            letterSpacing = if (isValidAddress) 0.5.sp else 0.sp,
-                            color = analyzeTextColor
+                            "DEMO",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondary
                         )
-                    }
-
-                    // Demo Button — fades when valid address entered
-                    AnimatedVisibility(
-                        visible = !isValidAddress,
-                        enter = fadeIn(tween(150)) + expandHorizontally(tween(150)),
-                        exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150))
-                    ) {
-                        ClayButton(
-                            onClick = { walletAddress = demoAddress },
-                            backgroundColor = AutumnPrimary,
-                            modifier = Modifier
-                                .width(100.dp)
-                                .height(72.dp),
-                            cornerRadius = 20.dp
-                        ) {
-                            Text(
-                                "Demo",
-                                fontWeight = FontWeight.ExtraBold,
-                                fontSize = 17.sp,
-                                color = AutumnText
-                            )
-                        }
                     }
                 }
             }

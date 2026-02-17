@@ -9,50 +9,54 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+private val CyberColorScheme = darkColorScheme(
+    primary = CyberColors.NeonBlue,
+    onPrimary = CyberColors.TextPrimary,
+    secondary = CyberColors.NeonPurple,
+    onSecondary = CyberColors.TextPrimary,
+    tertiary = CyberColors.NeonMint,
+    onTertiary = CyberColors.TextPrimary,
+    background = CyberColors.Background,
+    onBackground = CyberColors.TextPrimary,
+    surface = CyberColors.Surface,
+    onSurface = CyberColors.TextPrimary,
+    surfaceVariant = CyberColors.SurfaceHighlight,
+    onSurfaceVariant = CyberColors.TextSecondary,
+    error = CyberColors.NeonRed,
+    onError = CyberColors.TextPrimary
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = CyberLightColors.NeonBlue,
     onPrimary = Color.White,
+    secondary = CyberLightColors.NeonPurple,
     onSecondary = Color.White,
+    tertiary = CyberLightColors.NeonMint,
     onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    background = CyberLightColors.Background,
+    onBackground = CyberLightColors.TextPrimary,
+    surface = CyberLightColors.Surface,
+    onSurface = CyberLightColors.TextPrimary,
+    surfaceVariant = CyberLightColors.SurfaceHighlight,
+    onSurfaceVariant = CyberLightColors.TextSecondary,
+    error = CyberLightColors.NeonRed,
+    onError = Color.White
 )
 
 @Composable
 fun SolScopeTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    darkTheme: Boolean = true, // Default to dark, but controllable
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = if (darkTheme) CyberColorScheme else LightColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = CyberTypography, // Typography should arguably adapt too, but for now we keep font styles
         content = content
     )
 }

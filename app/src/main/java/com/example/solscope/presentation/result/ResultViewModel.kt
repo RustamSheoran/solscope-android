@@ -37,12 +37,18 @@ class ResultViewModel(
                 val balance = rpcClient.getBalance(sanitizedAddress, SolanaNetwork.MAINNET)
                 val history = rpcClient.getSignaturesForAddress(sanitizedAddress, SolanaNetwork.MAINNET, 50)
                 val accountInfo = rpcClient.getAccountInfo(sanitizedAddress, SolanaNetwork.MAINNET)
+                val tokenAccounts = try {
+                    rpcClient.getTokenAccountsByOwner(sanitizedAddress, SolanaNetwork.MAINNET)
+                } catch (_: Exception) {
+                    emptyList()
+                }
 
                 val snapshot = WalletSnapshotBuilder.fromRpcData(
                     address = sanitizedAddress,
                     balance = balance,
                     history = history,
-                    accountInfo = accountInfo
+                    accountInfo = accountInfo,
+                    tokenAccounts = tokenAccounts
                 )
 
                 val score = riskEngine.calculateRisk(snapshot)

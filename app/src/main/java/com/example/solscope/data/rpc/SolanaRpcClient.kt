@@ -35,10 +35,18 @@ interface SolanaRpcClient {
         address: String,
         network: SolanaNetwork,
         limit: Int
-    ): List<String>
+    ): List<com.example.solscope.data.rpc.model.SignatureInfo>
 
     suspend fun getAccountInfo(
         address: String,
         network: SolanaNetwork
     ): com.example.solscope.data.rpc.model.AccountInfoValue?
+
+    /**
+     * Returns all SPL token accounts owned by the given address.
+     */
+    suspend fun getTokenAccountsByOwner(
+        address: String,
+        network: SolanaNetwork
+    ): List<com.example.solscope.data.rpc.model.TokenAccountInfo>
 }

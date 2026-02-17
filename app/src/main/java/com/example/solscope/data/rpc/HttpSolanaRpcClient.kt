@@ -62,7 +62,7 @@ class HttpSolanaRpcClient(
         address: String,
         network: SolanaNetwork,
         limit: Int
-    ): List<String> = withContext(Dispatchers.IO) {
+    ): List<SignatureInfo> = withContext(Dispatchers.IO) {
         val params = buildJsonArray {
             add(address)
             addJsonObject {
@@ -82,13 +82,22 @@ class HttpSolanaRpcClient(
         
         val resultElement = executeAndGetResult(httpRequest)
         
-        // Manual Parsing for List<SignatureInfo>
-        // Structure: [ { "signature": "...", ... }, ... ]
         val resultArray = resultElement.jsonArray
         resultArray.map { item ->
             val itemObj = item.jsonObject
-            itemObj["signature"]?.jsonPrimitive?.content 
+            val signature = itemObj["signature"]?.jsonPrimitive?.content 
                 ?: throw SolanaRpcException("Missing 'signature' in history item")
+            val slot = itemObj["slot"]?.jsonPrimitive?.long ?: 0L
+            val blockTime = itemObj["blockTime"]?.jsonPrimitive?.longOrNull
+            val err = itemObj["err"]?.let { errEl ->
+                if (errEl is JsonNull) null else SignatureErrorInfo()
+            }
+            SignatureInfo(
+                signature = signature,
+                slot = slot,
+                blockTime = blockTime,
+                err = err
+            )
         }
     }
 
@@ -146,6 +155,61 @@ class HttpSolanaRpcClient(
             owner = owner,
             rentEpoch = rentEpoch
         )
+    }
+
+    override suspend fun getTokenAccountsByOwner(
+        address: String,
+        network: SolanaNetwork
+    ): List<com.example.solscope.data.rpc.model.TokenAccountInfo> = withContext(Dispatchers.IO) {
+        val params = buildJsonArray {
+            add(address)
+            addJsonObject {
+                put("programId", "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA")
+            }
+            addJsonObject {
+                put("encoding", "jsonParsed")
+            }
+        }
+
+        val requestBody = buildManualJsonRpcRequestBody(
+            method = "getTokenAccountsByOwner",
+            params = params
+        )
+
+        val httpRequest = Request.Builder()
+            .url(resolveNetworkUrl(network))
+            .post(requestBody)
+            .build()
+
+        val resultElement = executeAndGetResult(httpRequest)
+        val resultObj = resultElement.jsonObject
+        val valueArray = resultObj["value"]?.jsonArray ?: return@withContext emptyList()
+
+        valueArray.mapNotNull { item ->
+            try {
+                val account = item.jsonObject["account"]?.jsonObject ?: return@mapNotNull null
+                val data = account["data"]?.jsonObject ?: return@mapNotNull null
+                val parsed = data["parsed"]?.jsonObject ?: return@mapNotNull null
+                val info = parsed["info"]?.jsonObject ?: return@mapNotNull null
+                val tokenAmount = info["tokenAmount"]?.jsonObject ?: return@mapNotNull null
+
+                val mint = info["mint"]?.jsonPrimitive?.content ?: return@mapNotNull null
+                val amount = tokenAmount["amount"]?.jsonPrimitive?.content ?: "0"
+                val decimals = tokenAmount["decimals"]?.jsonPrimitive?.int ?: 0
+                val uiAmount = tokenAmount["uiAmount"]?.jsonPrimitive?.double ?: 0.0
+
+                if (uiAmount > 0.0) {
+                    com.example.solscope.data.rpc.model.TokenAccountInfo(
+                        mint = mint,
+                        amount = amount,
+                        decimals = decimals,
+                        uiAmount = uiAmount
+                    )
+                } else null
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 
     private fun resolveNetworkUrl(network: SolanaNetwork): String {
