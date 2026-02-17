@@ -23,7 +23,9 @@ data class JsonRpcResponse<T>(
     val id: Int,
     val result: T? = null,
     val error: JsonRpcError? = null
-)
+) {
+    companion object
+}
 
 /**
  * JSON-RPC 2.0 error object.
@@ -33,7 +35,9 @@ data class JsonRpcError(
     val code: Int,
     val message: String,
     val data: String? = null
-)
+) {
+    companion object
+}
 
 /**
  * Result for `getBalance` method.

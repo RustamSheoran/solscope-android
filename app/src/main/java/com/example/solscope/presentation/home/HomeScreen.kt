@@ -4,192 +4,208 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.solscope.presentation.components.PrimaryCard
-import kotlinx.coroutines.delay
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import com.example.solscope.presentation.components.ClayButton
+import com.example.solscope.presentation.components.ClayCard
+import com.example.solscope.presentation.theme.*
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onAnalyze: (String) -> Unit
+) {
 
     var walletAddress by remember { mutableStateOf("") }
-    var riskScore by remember { mutableStateOf(0) }
-    var isAnalyzing by remember { mutableStateOf(false) }
-
-    // Animated color based on risk
-    val riskColor by animateColorAsState(
-        targetValue = when {
-            riskScore < 30 -> Color(0xFF4CAF50)
-            riskScore < 70 -> Color(0xFFFFB020)
-            else -> Color(0xFFFF4D4F)
-        },
-        animationSpec = tween(600),
-        label = ""
-    )
-
-    // Animated number counter
-    val animatedScore by animateIntAsState(
-        targetValue = riskScore,
-        animationSpec = tween(durationMillis = 900, easing = FastOutSlowInEasing),
-        label = ""
-    )
+    val platformContext = LocalContext.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    
+    // Demo Address (Known active whale wallet for testing)
+    val demoAddress = "FxvohgxLw4GbpATWEVxoNkyS9wV3G27gt3whnXJi8rqa"
 
     Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "SolScope",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = Color.White
-                    )
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent
-                )
-            )
-        }
+        containerColor = AutumnBackground
     ) { padding ->
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF023859),
-                            Color(0xFF011C40)
-                        )
-                    )
-                )
                 .padding(padding)
                 .padding(horizontal = 20.dp)
         ) {
 
             Column(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.Top
             ) {
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Wallet Input
-                AnimatedVisibility(
-                    visible = true,
-                    enter = fadeIn() + slideInVertically { it / 3 }
-                ) {
-                    PrimaryCard {
-                        OutlinedTextField(
-                            value = walletAddress,
-                            onValueChange = { walletAddress = it },
-                            label = { Text("Solana Wallet Address") },
-                            modifier = Modifier.fillMaxWidth(),
-                            maxLines = 3,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFF54ACBF),
-                                unfocusedBorderColor = Color(0xFF2F4F6F),
-                                cursorColor = Color(0xFF54ACBF),
-                                focusedLabelColor = Color(0xFF54ACBF)
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Animated Button
-                val scale by animateFloatAsState(
-                    targetValue = if (isAnalyzing) 0.96f else 1f,
-                    animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-                    label = ""
+                Spacer(modifier = Modifier.height(100.dp))
+                
+                Text(
+                    "SolScope",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 36.sp,
+                    color = AutumnText
+                )
+                Text(
+                    "Risk Analysis Engine",
+                    fontSize = 18.sp,
+                    color = AutumnText.copy(alpha = 0.8f) 
                 )
 
-                Button(
-                    onClick = {
-                        isAnalyzing = true
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .scale(scale),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF54ACBF)
-                    ),
-                    shape = RoundedCornerShape(16.dp)
+                Spacer(modifier = Modifier.height(56.dp))
+
+                // Wallet Input - 3D ClayCard
+                ClayCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = AutumnBackground
                 ) {
-                    if (isAnalyzing) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    } else {
-                        Text(
-                            "Analyze Wallet",
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
+                    Text(
+                        "Target Wallet",
+                        fontWeight = FontWeight.Bold,
+                        color = AutumnText,
+                        fontSize = 18.sp,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    OutlinedTextField(
+                        value = walletAddress,
+                        onValueChange = { input ->
+                            // Reject spaces and newlines
+                            val filtered = input.filter { !it.isWhitespace() }
+                            walletAddress = filtered
+                        },
+                        placeholder = { 
+                            Text(
+                                "Enter Solana address...",
+                                color = AutumnText.copy(alpha = 0.6f) 
+                            ) 
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        maxLines = 1,
+                        textStyle = TextStyle(
+                            color = AutumnText,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 16.sp
+                        ),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Ascii,
+                            imeAction = ImeAction.Done
+                        ),
+                        trailingIcon = {
+                            IconButton(onClick = {
+                                val clipboard = platformContext.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                                val clipData = clipboard?.primaryClip
+                                if (clipData != null && clipData.itemCount > 0) {
+                                    val text = clipData.getItemAt(0).text.toString()
+                                    if (text.isNotBlank()) {
+                                        walletAddress = text.filter { !it.isWhitespace() }
+                                    }
+                                }
+                            }) {
+                                Text(
+                                    "Paste",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = AutumnText.copy(alpha = 0.6f)
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = AutumnPrimary,
+                            unfocusedBorderColor = Color.Transparent, 
+                            cursorColor = AutumnPrimary,
+                            focusedLabelColor = AutumnPrimary,
+                            unfocusedContainerColor = Color.White.copy(alpha = 0.5f), 
+                            focusedContainerColor = Color.White
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Fake analysis simulation (UI only)
-                LaunchedEffect(isAnalyzing) {
-                    if (isAnalyzing) {
-                        delay(1200)
-                        riskScore = (20..85).random()
-                        isAnalyzing = false
-                    }
-                }
+                // Solana addresses are 32-44 chars (base58)
+                val isValidAddress = walletAddress.length >= 32
 
-                // Risk Card
-                AnimatedVisibility(
-                    visible = riskScore > 0,
-                    enter = fadeIn(animationSpec = tween(500)) +
-                            slideInVertically(animationSpec = tween(500)) { it / 2 }
+                // Color transition only when valid address (32+ chars)
+                val analyzeColor by animateColorAsState(
+                    targetValue = if (isValidAddress) AutumnText else AutumnSecondary,
+                    animationSpec = tween(durationMillis = 200),
+                    label = "AnalyzeColor"
+                )
+                val analyzeTextColor by animateColorAsState(
+                    targetValue = if (isValidAddress) Color.White else AutumnText.copy(alpha = 0.5f),
+                    animationSpec = tween(durationMillis = 200),
+                    label = "AnalyzeTextColor"
+                )
+                val analyzeText = if (isValidAddress) "Analyze Wallet" else "Analyze"
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    PrimaryCard {
+                    // Analyze Button — color fills when valid address entered
+                    ClayButton(
+                        onClick = {
+                            if (isValidAddress) {
+                                keyboardController?.hide()
+                                onAnalyze(walletAddress)
+                            }
+                        },
+                        enabled = isValidAddress,
+                        backgroundColor = analyzeColor,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(72.dp),
+                        cornerRadius = 20.dp
+                    ) {
+                        Text(
+                            analyzeText,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = if (isValidAddress) 21.sp else 18.sp,
+                            letterSpacing = if (isValidAddress) 0.5.sp else 0.sp,
+                            color = analyzeTextColor
+                        )
+                    }
 
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth()
+                    // Demo Button — fades when valid address entered
+                    AnimatedVisibility(
+                        visible = !isValidAddress,
+                        enter = fadeIn(tween(150)) + expandHorizontally(tween(150)),
+                        exit = fadeOut(tween(150)) + shrinkHorizontally(tween(150))
+                    ) {
+                        ClayButton(
+                            onClick = { walletAddress = demoAddress },
+                            backgroundColor = AutumnPrimary,
+                            modifier = Modifier
+                                .width(100.dp)
+                                .height(72.dp),
+                            cornerRadius = 20.dp
                         ) {
-
                             Text(
-                                text = "Risk Score",
-                                color = Color(0xFFA7EBF2),
-                                fontSize = 14.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(
-                                text = animatedScore.toString(),
-                                fontSize = 48.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = riskColor
-                            )
-
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Text(
-                                text = when {
-                                    animatedScore < 30 -> "Low Risk"
-                                    animatedScore < 70 -> "Medium Risk"
-                                    else -> "High Risk"
-                                },
-                                color = riskColor
+                                "Demo",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 17.sp,
+                                color = AutumnText
                             )
                         }
                     }

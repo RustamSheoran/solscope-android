@@ -1,27 +1,29 @@
 package com.example.solscope.data.rpc
 
-import com.example.solscope.data.rpc.model.GetBalanceResult
-import com.example.solscope.data.rpc.model.JsonRpcRequest
-import com.example.solscope.data.rpc.model.JsonRpcResponse
-import com.example.solscope.data.rpc.model.SignatureInfo
+import com.example.solscope.data.rpc.model.*
 import com.example.solscope.domain.model.SolanaNetwork
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
 /**
  * HTTP-based implementation of [SolanaRpcClient] using OkHttp
- * and kotlinx.serialization for lightweight JSON-RPC calls.
+ * and Manual JSON parsing to avoid serialization issues.
  */
 class HttpSolanaRpcClient(
-    private val client: OkHttpClient = OkHttpClient(),
+    private val client: OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build(),
     private val json: Json = Json {
         ignoreUnknownKeys = true
+        encodeDefaults = true
     }
 ) : SolanaRpcClient {
 
@@ -31,31 +33,12 @@ class HttpSolanaRpcClient(
         address: String,
         network: SolanaNetwork
     ): Long = withContext(Dispatchers.IO) {
-        val requestBody = buildJsonRpcRequestBody(
+        val params = buildJsonArray {
+            add(address)
+        }
+        
+        val requestBody = buildManualJsonRpcRequestBody(
             method = "getBalance",
-            params = listOf(address)
-        )
-
-        val httpRequest = Request.Builder()
-            .url(resolveNetworkUrl(network))
-            .post(requestBody)
-            .build()
-
-        executeAndParse<GetBalanceResult>(httpRequest).value
-    }
-
-    override suspend fun getSignaturesForAddress(
-        address: String,
-        network: SolanaNetwork,
-        limit: Int
-    ): List<String> = withContext(Dispatchers.IO) {
-        val params = listOf(
-            address,
-            mapOf("limit" to limit)
-        )
-
-        val requestBody = buildJsonRpcRequestBody(
-            method = "getSignaturesForAddress",
             params = params
         )
 
@@ -64,20 +47,63 @@ class HttpSolanaRpcClient(
             .post(requestBody)
             .build()
 
-        executeAndParse<List<SignatureInfo>>(httpRequest)
-            .map { it.signature }
+        val resultElement = executeAndGetResult(httpRequest)
+        
+        // Manual Parsing for GetBalanceResult
+        // Structure: { "context": { "slot": 123 }, "value": 123456 }
+        val resultObj = resultElement.jsonObject
+        val value = resultObj["value"]?.jsonPrimitive?.long 
+            ?: throw SolanaRpcException("Missing 'value' in getBalance response")
+            
+        value
+    }
+
+    override suspend fun getSignaturesForAddress(
+        address: String,
+        network: SolanaNetwork,
+        limit: Int
+    ): List<String> = withContext(Dispatchers.IO) {
+        val params = buildJsonArray {
+            add(address)
+            addJsonObject {
+                put("limit", limit)
+            }
+        }
+
+        val requestBody = buildManualJsonRpcRequestBody(
+            method = "getSignaturesForAddress",
+            params = params
+        )
+
+        val httpRequest = Request.Builder()
+            .url(resolveNetworkUrl(network))
+            .post(requestBody)
+            .build()
+        
+        val resultElement = executeAndGetResult(httpRequest)
+        
+        // Manual Parsing for List<SignatureInfo>
+        // Structure: [ { "signature": "...", ... }, ... ]
+        val resultArray = resultElement.jsonArray
+        resultArray.map { item ->
+            val itemObj = item.jsonObject
+            itemObj["signature"]?.jsonPrimitive?.content 
+                ?: throw SolanaRpcException("Missing 'signature' in history item")
+        }
     }
 
     override suspend fun getAccountInfo(
         address: String,
         network: SolanaNetwork
-    ): com.example.solscope.data.rpc.model.AccountInfoValue? = withContext(Dispatchers.IO) {
-        val params = listOf(
-            address,
-            mapOf("encoding" to "jsonParsed")
-        )
+    ): AccountInfoValue? = withContext(Dispatchers.IO) {
+        val params = buildJsonArray {
+            add(address)
+            addJsonObject {
+                put("encoding", "jsonParsed")
+            }
+        }
 
-        val requestBody = buildJsonRpcRequestBody(
+        val requestBody = buildManualJsonRpcRequestBody(
             method = "getAccountInfo",
             params = params
         )
@@ -87,7 +113,39 @@ class HttpSolanaRpcClient(
             .post(requestBody)
             .build()
             
-        executeAndParse<com.example.solscope.data.rpc.model.GetAccountInfoResult>(httpRequest).value
+        val resultElement = executeAndGetResult(httpRequest)
+        
+        // Manual Parsing for GetAccountInfoResult
+        // Structure: { "context": ..., "value": { "data": ..., "owner": ... } or null }
+        if (resultElement is JsonNull) return@withContext null
+        val resultObj = resultElement.jsonObject
+        
+        val valueElement = resultObj["value"]
+        if (valueElement == null || valueElement is JsonNull) {
+            return@withContext null
+        }
+        
+        val valueObj = valueElement.jsonObject
+        
+        // AccountInfoValue(data, executable, lamports, owner, rentEpoch)
+        
+        val owner = valueObj["owner"]?.jsonPrimitive?.content ?: ""
+        val executable = valueObj["executable"]?.jsonPrimitive?.boolean ?: false
+        val lamports = valueObj["lamports"]?.jsonPrimitive?.long ?: 0L
+        
+        // Handle rentEpoch safely as it can exceed Long.MAX_VALUE (UINT64)
+        val rentEpochVal = valueObj["rentEpoch"]?.jsonPrimitive?.content ?: "0"
+        val rentEpoch = rentEpochVal.toLongOrNull() ?: 0L // Default to 0 if overflow or invalid
+        
+        val data = emptyList<String>() 
+
+        AccountInfoValue(
+            data = data,
+            executable = executable,
+            lamports = lamports,
+            owner = owner,
+            rentEpoch = rentEpoch
+        )
     }
 
     private fun resolveNetworkUrl(network: SolanaNetwork): String {
@@ -97,25 +155,31 @@ class HttpSolanaRpcClient(
         }
     }
 
-    private fun <T> buildJsonRpcRequestBody(
+    private fun buildManualJsonRpcRequestBody(
         method: String,
-        params: T
-    ) = JsonRpcRequest(
-        id = nextRequestId(),
-        method = method,
-        params = params
-    ).let { request ->
-        val jsonString = json.encodeToString(request)
-        jsonString.toRequestBody(jsonMediaType)
+        params: JsonElement
+    ): okhttp3.RequestBody {
+        val jsonObject = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", nextRequestId())
+            put("method", method)
+            put("params", params)
+        }
+        return jsonObject.toString().toRequestBody(jsonMediaType)
     }
 
-    private suspend inline fun <reified T> executeAndParse(
+    /**
+     * Executes request and returns the 'result' JSON element.
+     * Throws exception if error occurs.
+     */
+    private suspend fun executeAndGetResult(
         httpRequest: Request
-    ): T = withContext(Dispatchers.IO) {
+    ): JsonElement = withContext(Dispatchers.IO) {
         val response = try {
             client.newCall(httpRequest).execute()
         } catch (t: Throwable) {
-            throw SolanaRpcException("Network request to Solana RPC failed", t)
+            // Include specific error message
+            throw SolanaRpcException("Network request failed: ${t.message}", t)
         }
 
         response.use { resp ->
@@ -128,23 +192,34 @@ class HttpSolanaRpcClient(
             val bodyString = resp.body?.string()
                 ?: throw SolanaRpcException("Solana RPC response body was null")
 
-            val rpcResponse = try {
-                json.decodeFromString<JsonRpcResponse<T>>(bodyString)
+            val jsonObject = try {
+                json.parseToJsonElement(bodyString).jsonObject
             } catch (t: Throwable) {
-                throw SolanaRpcException("Failed to decode Solana RPC response", t)
+                throw SolanaRpcException("Failed to decode Solana RPC response JSON", t)
             }
 
-            rpcResponse.error?.let { error ->
-                throw SolanaRpcException(
-                    "Solana RPC error ${error.code}: ${error.message}"
-                )
+            // Check for error first
+            if (jsonObject.containsKey("error")) {
+                val errorElement = jsonObject["error"]
+                if (errorElement != null) {
+                   // Manual parsing
+                    val errorObj = errorElement.jsonObject
+                    val code = errorObj["code"]?.jsonPrimitive?.intOrNull ?: -1
+                    val message = errorObj["message"]?.jsonPrimitive?.content ?: "Unknown error"
+                    throw SolanaRpcException(
+                        "Solana RPC error $code: $message"
+                    )
+                }
             }
 
-            rpcResponse.result
-                ?: throw SolanaRpcException("Solana RPC response missing result")
+            // Check for result
+            if (jsonObject.containsKey("result")) {
+                return@withContext jsonObject["result"] ?: JsonNull
+            }
+            
+            throw SolanaRpcException("Solana RPC response missing result")
         }
     }
 
     private fun nextRequestId(): Int = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
 }
-
