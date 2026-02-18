@@ -1,5 +1,8 @@
 # SolScope 🔭
 
+> [!WARNING]
+> This project is **no longer maintained**. The entire codebase is being rewritten in **React Native** due to time constraints and to align with the 100xMobile Bootcamp curriculum.
+
 **Advanced Solana Wallet Analyzer & Risk Intelligence Tool**
 
 SolScope is a native Android application designed to provide transparency into the Solana ecosystem. It bypasses traditional heavy SDKs in favor of a raw, lightweight JSON-RPC implementation to communicate directly with the Solana Mainnet.
